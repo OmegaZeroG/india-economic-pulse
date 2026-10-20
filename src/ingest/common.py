@@ -50,3 +50,21 @@ def upsert(new: pd.DataFrame, path: Path, key: list[str]) -> int:
                 .sort_values(key).reset_index(drop=True))
     combined.to_csv(path, index=False)
     return len(combined)
+
+
+def read_any(path, **kw) -> pd.DataFrame:
+    """Read a downloaded table whatever its extension says.
+
+    Portals often save Excel files as .csv (or .xlsx as .xls), so sniff the
+    file's first bytes: ZIP = xlsx, OLE2 = xls, otherwise text CSV.
+    """
+    with open(path, "rb") as f:
+        head = f.read(8)
+    if head[:2] == b"PK" or head[:4] == bytes([0xD0, 0xCF, 0x11, 0xE0]):
+        return pd.read_excel(path, **kw)
+    for enc in ("utf-8-sig", "cp1252"):
+        try:
+            return pd.read_csv(path, encoding=enc, **kw)
+        except UnicodeDecodeError:
+            continue
+    raise ValueError(f"cannot decode {path}")

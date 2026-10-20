@@ -12,7 +12,7 @@ import sys
 
 import pandas as pd
 
-from common import CLEAN, RAW, log_issue, upsert
+from common import CLEAN, read_any, RAW, log_issue, upsert
 
 
 def _find(cols, *needles):
@@ -24,7 +24,7 @@ def _find(cols, *needles):
 
 
 def parse(path) -> pd.DataFrame:
-    df = pd.read_excel(path) if str(path).lower().endswith(("xls", "xlsx")) else pd.read_csv(path)
+    df = read_any(path)
     mcol = _find(df.columns, "month")
     out = pd.DataFrame({
         "month": pd.to_datetime(df[mcol], format="mixed", errors="coerce").dt.to_period("M").dt.to_timestamp(),
