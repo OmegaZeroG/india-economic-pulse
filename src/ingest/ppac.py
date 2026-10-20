@@ -1,10 +1,9 @@
 """Parse the manually downloaded PPAC product-wise consumption file into data/clean/fact_fuel.csv.
 
-Input: data/raw/ppac_* (xls/xlsx/csv). PPAC publishes a wide table: one row per
-product, month columns grouped under fiscal years. This parser handles the wide
-layout where a header row holds the month names and a fiscal-year marker
-(e.g. "2025-26") sits above or in a column. Layout is verified against the real
-file when it is downloaded; adjust FY_HEADER_ROWS if it differs.
+Input: data/raw/ppac_* (xls/xlsx). Files: the Historical Report (one sheet per fiscal year,
+rows = products, columns APR..MAR) and the Current Report (this FY, provisional).
+Files are processed in name order, so ppac_current_* overrides older values.
+Sheets before FY2016-17 use another layout and are skipped.
 
 Keeps petrol (MS), diesel (HSD), ATF, LPG and bitumen. Unit: thousand metric tonnes.
 
@@ -15,7 +14,7 @@ import sys
 
 import pandas as pd
 
-from common import CLEAN, MONTHS, RAW, log_issue, upsert
+from common import CLEAN, MONTHS, RAW, read_any, log_issue, upsert
 
 KEEP = {"ms": "Petrol (MS)", "petrol": "Petrol (MS)", "hsd": "Diesel (HSD)", "diesel": "Diesel (HSD)",
         "atf": "ATF", "lpg": "LPG", "bitumen": "Bitumen"}
@@ -29,32 +28,42 @@ def _product(name: str):
     return None
 
 
+def _fy_start(sheet: pd.DataFrame, sheet_name: str) -> int:
+    """Fiscal-year start from the 'Period : April 2025-March 2026' / 'April-26 to Sept-26' cell."""
+    for v in map(str, sheet.iloc[:8, 0]):
+        m = re.search(r"Period\s*:?\s*([A-Za-z]+)[\s-]*(20\d{2}|\d{2})", v)
+        if m:
+            y = int(m.group(2))
+            return y + 2000 if y < 100 else y
+    m = re.match(r"(20\d{2})-\d{2}$", sheet_name)
+    if m:
+        return int(m.group(1))
+    raise ValueError(f"cannot find fiscal year in sheet {sheet_name!r}")
+
+
 def parse(path) -> pd.DataFrame:
-    raw = pd.read_excel(path, header=None) if str(path).lower().endswith(("xls", "xlsx")) \
-        else pd.read_csv(path, header=None)
-    # locate the header row: the one with the most month names
-    hdr = max(range(min(15, len(raw))),
-              key=lambda i: sum(str(v).strip().title() in MONTHS for v in raw.iloc[i]))
-    # fiscal year labels like 2025-26 anywhere above or on the header row
-    fy_at = {}
-    for i in range(hdr + 1):
-        for j, v in raw.iloc[i].items():
-            m = re.search(r"(20\d{2})\s*[-–/]\s*(\d{2,4})", str(v))
-            if m:
-                fy_at[j] = int(m.group(1))
-    rows, fy = [], None
-    for j in raw.columns:
-        mname = str(raw.iloc[hdr, j]).strip().title()
-        fy = fy_at.get(j, fy)
-        if mname not in MONTHS or fy is None:
-            continue
-        mnum = MONTHS[mname]
-        year = fy if mnum >= 4 else fy + 1  # fiscal year April-March
-        for i in range(hdr + 1, len(raw)):
-            prod = _product(raw.iloc[i, 0])
-            val = pd.to_numeric(str(raw.iloc[i, j]).replace(",", ""), errors="coerce")
-            if prod and pd.notna(val):
-                rows.append({"month": f"{year}-{mnum:02d}-01", "product": prod, "consumption_kt": val})
+    """One workbook = one sheet per fiscal year (+ an annual summary sheet, skipped)."""
+    sheets = pd.read_excel(path, header=None, sheet_name=None)
+    rows = []
+    for name, raw in sheets.items():
+        if not (re.match(r"20\d{2}-\d{2}$", name) or name == "Consumption"):
+            continue  # 'Historical (year-wise)' is annual totals
+        hdr = next((i for i in range(len(raw)) if str(raw.iloc[i, 0]).strip().upper() == "PRODUCTS"), None)
+        if hdr is None:
+            continue  # pre-2016 sheets with other layouts are outside our window
+        fy = _fy_start(raw, name)
+        for j in range(1, raw.shape[1]):
+            mname = str(raw.iloc[hdr, j]).strip().title()[:3]
+            mnum = next((n for full, n in MONTHS.items() if full[:3] == mname), None)
+            if mnum is None:
+                continue
+            year = fy if mnum >= 4 else fy + 1  # fiscal year April-March
+            for i in range(hdr + 1, len(raw)):
+                prod = _product(raw.iloc[i, 0])
+                val = pd.to_numeric(str(raw.iloc[i, j]).replace(",", ""), errors="coerce")
+                if prod and pd.notna(val):
+                    rows.append({"month": f"{year}-{mnum:02d}-01", "product": prod,
+                                 "consumption_kt": round(float(val), 3)})
     return pd.DataFrame(rows)
 
 
