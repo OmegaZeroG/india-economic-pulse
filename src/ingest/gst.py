@@ -6,8 +6,10 @@ Inputs (data/raw):
   gst_state_FY*_*.xlsx     one per financial year: All-India, state-wise collection, state-wise refund.
 
 Outputs (data/clean):
-  fact_gst_national.csv  month, cgst_cr, sgst_cr, igst_cr, cess_cr, gross_cr, refunds_cr, net_cr
-                         (gross = domestic + imports, including cess; Rs crore as published)
+  fact_gst_national.csv  month, cgst_cr, sgst_cr, igst_cr, cess_cr, gross_cr, refunds_cr, net_cr,
+                         domestic_ex_cess_cr, gross_ex_cess_cr, refunds_ex_cess_cr, net_ex_cess_cr
+                         (gross = domestic + imports, *_cr includes cess; *_ex_cess_cr is CGST+SGST+IGST
+                         only, the consistent series across the Mar 2026 end of compensation cess)
   fact_gst_state.csv     month, state_code, state, cgst_cr, sgst_cr, igst_cr, gross_cr, refunds_cr, net_cr
                          DOMESTIC collections EXCLUDING cess: the state workbooks stopped publishing
                          cess after FY2024-25 (compensation cess was being phased out), so cess is left
@@ -60,20 +62,38 @@ def parse_national(path) -> pd.DataFrame:
         lab = sh.iloc[:, 0].astype(str).str.strip()
         low = lab.str.lower()
         a3 = low[low.str.startswith("a.3")].index[0]
+        sec = {k: low[low.str.startswith(k)].index[0] for k in ("a.3", "b.3", "c.3")}
+        # the Dec-25 sheet lacks its "A.1. Domestic" heading: the domestic block then starts at the first CGST row
+        h = low[low.str.startswith("a.1")]
+        sec["a.1"] = h.index[0] if len(h) else low[low == "cgst"].index[0] - 1
+
+        def ex_cess(start: int, col: int) -> float:
+            """CGST + SGST + IGST rows directly under a section heading (cess excluded)."""
+            vals = {}
+            for k in range(start + 1, min(start + 6, len(low))):
+                if low.iloc[k] in ("cgst", "sgst", "igst"):
+                    vals[low.iloc[k]] = pd.to_numeric(sh.iloc[k, col])
+            return sum(vals.values())
+
         for col, m in ((cur, month), (prev, month - pd.DateOffset(years=1))):
             rec = {"cess_cr": 0.0}
-            for k in range(a3 + 1, a3 + 6):                       # CGST, SGST, IGST, [CESS] then total
+            for k in range(a3 + 1, min(a3 + 6, len(low))):                       # CGST, SGST, IGST, [CESS] then total
                 l = low.iloc[k]
                 if l in ("cgst", "sgst", "igst", "cess"):
                     rec[f"{l}_cr"] = pd.to_numeric(sh.iloc[k, col])
             for key, out in NAT_COLS.items():
                 rec[out] = pd.to_numeric(sh.loc[low.str.startswith(key), col].iloc[0])
+            rec["domestic_ex_cess_cr"] = ex_cess(sec["a.1"], col)
+            rec["gross_ex_cess_cr"] = ex_cess(sec["a.3"], col)
+            rec["refunds_ex_cess_cr"] = ex_cess(sec["b.3"], col)
+            rec["net_ex_cess_cr"] = ex_cess(sec["c.3"], col)
             key = m.strftime("%Y-%m-%d")
             # a month's own sheet (current column) outranks the later 'last year' column
             if key not in rows or col == cur:
                 rows[key] = {"month": key, **rec}
     df = pd.DataFrame(rows.values()).sort_values("month").reset_index(drop=True)
-    return df[["month", "cgst_cr", "sgst_cr", "igst_cr", "cess_cr", "gross_cr", "refunds_cr", "net_cr"]]
+    return df[["month", "cgst_cr", "sgst_cr", "igst_cr", "cess_cr", "gross_cr", "refunds_cr", "net_cr",
+               "domestic_ex_cess_cr", "gross_ex_cess_cr", "refunds_ex_cess_cr", "net_ex_cess_cr"]]
 
 
 # ----------------------------------------------------------------------------- state workbooks
