@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+.venv/
+.ipynb_checkpoints/
+*.db
+*.sqlite
+.env
+# raw files are committed deliberately (never edited); large ones can be added to this list
