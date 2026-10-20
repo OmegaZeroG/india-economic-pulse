@@ -33,3 +33,6 @@ Every gap, fix and revision, in date order.
 | 2026-10-21 | SQL | Five checks in sql/checks.sql all pass on the full load; each was also shown to fail on deliberately broken data (gap, negative, state total, extra row, growth spike) | none needed | 5 checks |
 | 2026-10-21 | SQL | Update path tested: re-running load_db.py changes no row counts; adding one new month twice gives exactly one new row | none needed | 1 |
 | 2026-10-21 | SQL | Fuel history starts Apr 2000 and includes COVID months (Apr-Jun 2020, flagged in dim_date); growth-plausibility check only covers the project window from Apr 2023 | none needed | 3 months |
+| 2026-10-21 | PPAC | latest months are provisional and get revised | re-download each month, upsert | 1590 |
+| 2026-10-21 | E-way bill | outgoing vs incoming bill counts differ by up to 0.7% in a month | kept both; national total uses within-state + outgoing only | 41 |
+| 2026-10-21 | Raw files | 11 raw files (PPAC, GST, e-way bill) were saved with future dates (22 and 23 Oct) in their names; the machine date and the GitHub repo both show 21 Oct | Renamed to 2026-10-21, the real download date; loaders re-run, all 5 checks still pass | 11 files |
