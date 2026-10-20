@@ -2,10 +2,10 @@
 
 > Early-read index of Indian economic activity from UPI, GST and fuel data, tested against official IIP growth.
 
-**Status:** Week 1 - data access (started 20 Oct 2026). Headline result, backtest table and forecast link will be added as the project progresses.
+**Status:** Week 1 - data access (started 20 Oct 2026). UPI, fuel, GST, e-way bill and IIP all load from raw files. Headline result, backtest table and forecast link will be added as the project progresses.
 
 ## Scope decision
-Minimum project: UPI + GST + fuel (petrol, diesel, ATF, LPG, bitumen) vs IIP. E-way bills and electricity: *TBD at end of Week 1.*
+Minimum project: UPI + GST + fuel (petrol, diesel, ATF, LPG, bitumen) vs IIP. **E-way bills: kept** (usable monthly Excel file, 41 months, updated by the GST portal). **Electricity: dropped** unless a live feed turns up; the core index does not need it.
 
 ## Folder map
 | Folder | Contents |
