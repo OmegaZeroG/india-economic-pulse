@@ -1,0 +1,51 @@
+variant,model,n_months,mae,direction_hit_pct,mae_improvement_vs_best_baseline_pct,label
+"main: 7 indicators, base 2022-23, 12-month minimum training",naive_last,29,2.241,,-19.193,Last month's value
+"main: 7 indicators, base 2022-23, 12-month minimum training",naive_mean12,29,1.88,71.429,0.0,12-month average
+"main: 7 indicators, base 2022-23, 12-month minimum training",zscore_index,29,1.979,75.0,-5.258,Z-score index
+"main: 7 indicators, base 2022-23, 12-month minimum training",pca_index,29,2.072,75.0,-10.175,PCA index
+"main: 7 indicators, base 2022-23, 12-month minimum training",regression,29,2.324,60.714,-23.596,Regression
+8 indicators (adds e-way bills),naive_last,29,2.241,,-19.193,Last month's value
+8 indicators (adds e-way bills),naive_mean12,29,1.88,71.429,0.0,12-month average
+8 indicators (adds e-way bills),zscore_index,29,1.591,78.571,15.412,Z-score index
+8 indicators (adds e-way bills),pca_index,29,2.027,71.429,-7.772,PCA index
+8 indicators (adds e-way bills),regression,29,2.338,60.714,-24.33,Regression
+minimum training 10 months,naive_last,31,2.442,,-4.744,Last month's value
+minimum training 10 months,naive_mean12,31,2.331,70.0,0.0,12-month average
+minimum training 10 months,zscore_index,31,2.446,73.333,-4.919,Z-score index
+minimum training 10 months,pca_index,31,2.466,73.333,-5.771,PCA index
+minimum training 10 months,regression,31,2.771,60.0,-18.865,Regression
+minimum training 15 months,naive_last,26,2.035,,0.0,Last month's value
+minimum training 15 months,naive_mean12,26,2.075,69.231,-1.985,12-month average
+minimum training 15 months,zscore_index,26,1.888,73.077,7.188,Z-score index
+minimum training 15 months,pca_index,26,2.027,73.077,0.352,PCA index
+minimum training 15 months,regression,26,2.397,61.538,-17.809,Regression
+excluding Diwali-shift months from scoring,naive_last,27,2.363,,-25.962,Last month's value
+excluding Diwali-shift months from scoring,naive_mean12,27,1.876,69.231,0.0,12-month average
+excluding Diwali-shift months from scoring,zscore_index,27,2.076,73.077,-10.641,Z-score index
+excluding Diwali-shift months from scoring,pca_index,27,2.168,73.077,-15.553,PCA index
+excluding Diwali-shift months from scoring,regression,27,2.38,57.692,-26.885,Regression
+"IIP base 2011-12 (robustness series), COVID months included",naive_last,71,4.561,,0.0,Last month's value
+"IIP base 2011-12 (robustness series), COVID months included",naive_mean12,71,6.028,60.87,-32.18,12-month average
+"IIP base 2011-12 (robustness series), COVID months included",zscore_index,71,5.375,56.522,-17.852,Z-score index
+"IIP base 2011-12 (robustness series), COVID months included",pca_index,71,4.127,57.971,9.503,PCA index
+"IIP base 2011-12 (robustness series), COVID months included",regression,71,3.72,52.174,18.431,Regression
+"IIP base 2011-12, COVID-affected months excluded",naive_last,66,3.633,,-6.381,Last month's value
+"IIP base 2011-12, COVID-affected months excluded",naive_mean12,66,3.415,65.625,0.0,12-month average
+"IIP base 2011-12, COVID-affected months excluded",zscore_index,66,3.628,60.938,-6.212,Z-score index
+"IIP base 2011-12, COVID-affected months excluded",pca_index,66,2.92,65.625,14.517,PCA index
+"IIP base 2011-12, COVID-affected months excluded",regression,66,2.786,68.75,18.421,Regression
+"IIP base 2011-12, COVID excluded, without UPI (5 indicators)",naive_last,66,3.633,,-6.381,Last month's value
+"IIP base 2011-12, COVID excluded, without UPI (5 indicators)",naive_mean12,66,3.415,65.625,0.0,12-month average
+"IIP base 2011-12, COVID excluded, without UPI (5 indicators)",zscore_index,66,2.705,67.188,20.804,Z-score index
+"IIP base 2011-12, COVID excluded, without UPI (5 indicators)",pca_index,66,2.875,64.062,15.836,PCA index
+"IIP base 2011-12, COVID excluded, without UPI (5 indicators)",regression,66,2.786,68.75,18.421,Regression
+"IIP base 2011-12, no UPI, COVID excluded, post-rebound, scored from Apr 2022",naive_last,48,3.019,,-22.597,Last month's value
+"IIP base 2011-12, no UPI, COVID excluded, post-rebound, scored from Apr 2022",naive_mean12,48,2.462,63.83,0.0,12-month average
+"IIP base 2011-12, no UPI, COVID excluded, post-rebound, scored from Apr 2022",zscore_index,48,2.847,65.957,-15.64,Z-score index
+"IIP base 2011-12, no UPI, COVID excluded, post-rebound, scored from Apr 2022",pca_index,48,2.958,61.702,-20.148,PCA index
+"IIP base 2011-12, no UPI, COVID excluded, post-rebound, scored from Apr 2022",regression,48,2.617,63.83,-6.298,Regression
+"IIP base 2011-12, no UPI, COVID excluded, calm period, scored from Apr 2023",naive_last,36,2.122,,-14.614,Last month's value
+"IIP base 2011-12, no UPI, COVID excluded, calm period, scored from Apr 2023",naive_mean12,36,1.852,65.714,0.0,12-month average
+"IIP base 2011-12, no UPI, COVID excluded, calm period, scored from Apr 2023",zscore_index,36,2.249,65.714,-21.455,Z-score index
+"IIP base 2011-12, no UPI, COVID excluded, calm period, scored from Apr 2023",pca_index,36,2.348,60.0,-26.826,PCA index
+"IIP base 2011-12, no UPI, COVID excluded, calm period, scored from Apr 2023",regression,36,2.158,62.857,-16.544,Regression

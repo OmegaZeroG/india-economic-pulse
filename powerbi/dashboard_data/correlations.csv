@@ -1,0 +1,8 @@
+indicator,label,"All months, Apr 2019 - Mar 2026",COVID months removed,Since Apr 2022,Since Apr 2023 (calm),months_covid_removed
+upi_daily_volume_mn,UPI daily volume,0.11,0.01,0.42,0.39,78
+upi_value_cr,UPI value,0.09,-0.06,0.42,0.38,78
+gst_gross_ex_cess_cr,GST gross (ex-cess),0.84,0.64,0.41,-0.06,78
+fuel_diesel_kt,Diesel,0.85,0.83,0.63,0.54,78
+fuel_petrol_kt,Petrol,0.86,0.71,0.56,-0.23,78
+fuel_atf_kt,Jet fuel (ATF),0.67,0.52,0.45,0.32,78
+fuel_bitumen_kt,Bitumen,0.48,0.46,0.5,0.69,78

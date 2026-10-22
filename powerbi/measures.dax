@@ -1,0 +1,84 @@
+// India Economic Pulse: DAX measures.
+// Table and column names are the CSV files in powerbi/data (Power BI uses the file name as the table name).
+// Paste each measure into a measure table (Modeling > New measure). Not run in this repository: test each one
+// in Power BI Desktop and fix names if you rename tables.
+//
+// Model: dim_date[month_start] (marked as the date table) 1 -> * every fact table's month column, single direction.
+// Facts: fact_upi, fact_gst_national, fact_gst_state, fact_fuel, fact_ewaybill_national, fact_iip, growth_monthly,
+//        index_monthly, backtest_results. fact_gdp joins on quarter_start.
+
+// ---------------------------------------------------------------- year-on-year growth (the plan's pattern)
+UPI Value YoY % =
+VAR cur  = SUM ( fact_upi[value_cr] )
+VAR prev = CALCULATE ( SUM ( fact_upi[value_cr] ), SAMEPERIODLASTYEAR ( dim_date[month_start] ) )
+RETURN DIVIDE ( cur - prev, prev )
+
+UPI Daily Volume YoY % =
+VAR cur  = AVERAGE ( fact_upi[avg_daily_volume_mn] )
+VAR prev = CALCULATE ( AVERAGE ( fact_upi[avg_daily_volume_mn] ), SAMEPERIODLASTYEAR ( dim_date[month_start] ) )
+RETURN DIVIDE ( cur - prev, prev )
+
+GST Net (ex cess) YoY % =
+VAR cur  = SUM ( fact_gst_national[net_ex_cess_cr] )
+VAR prev = CALCULATE ( SUM ( fact_gst_national[net_ex_cess_cr] ), SAMEPERIODLASTYEAR ( dim_date[month_start] ) )
+RETURN DIVIDE ( cur - prev, prev )
+
+// If SAMEPERIODLASTYEAR returns blank because dim_date has one row per month, use the pre-computed growth below:
+// growth_monthly already holds the year-on-year % for every indicator, calculated in SQL with LAG(value, 12).
+
+// ---------------------------------------------------------------- drill-down page (one slicer on growth_monthly[indicator])
+Selected Indicator YoY % =
+AVERAGE ( growth_monthly[yoy_pct] ) / 100
+
+Selected Indicator 3M Avg YoY % =
+VAR m = MAX ( dim_date[month_start] )
+RETURN
+    CALCULATE (
+        AVERAGE ( growth_monthly[yoy_pct] ),
+        DATESINPERIOD ( dim_date[month_start], m, -3, MONTH )
+    ) / 100
+
+GST Gross (ex cess), Rs crore =
+SUMX ( fact_gst_state, fact_gst_state[gross_cr] )
+
+// ---------------------------------------------------------------- headline page
+Latest IIP Month =
+CALCULATE ( MAX ( fact_iip[month] ), fact_iip[base_year] = "2022-23" )
+
+Latest IIP Growth % =
+VAR m = [Latest IIP Month]
+RETURN
+    CALCULATE (
+        MAX ( fact_iip[yoy_growth_pct] ),
+        fact_iip[base_year] = "2022-23",
+        fact_iip[month] = m
+    ) / 100
+
+Latest Index Value =
+VAR m = CALCULATE ( MAX ( index_monthly[month] ), ALL ( dim_date ) )
+RETURN CALCULATE ( MAX ( index_monthly[zscore_index] ), ALL ( dim_date ), index_monthly[month] = m )
+
+Index Direction =
+VAR m      = CALCULATE ( MAX ( index_monthly[month] ), ALL ( dim_date ) )
+VAR now    = CALCULATE ( MAX ( index_monthly[zscore_index] ), ALL ( dim_date ), index_monthly[month] = m )
+VAR before = CALCULATE ( MAX ( index_monthly[zscore_index] ), ALL ( dim_date ), index_monthly[month] = EDATE ( m, -1 ) )
+RETURN IF ( now > before, "Rising", "Falling" )
+
+// ---------------------------------------------------------------- scorecard page (slicer on backtest_results[model])
+Backtest MAE =
+AVERAGE ( backtest_results[abs_error] )
+
+Best Baseline MAE =
+MINX (
+    FILTER ( ALL ( backtest_results[model] ), LEFT ( backtest_results[model], 5 ) = "naive" ),
+    CALCULATE ( AVERAGE ( backtest_results[abs_error] ) )
+)
+
+MAE Improvement vs Best Baseline % =
+DIVIDE ( [Best Baseline MAE] - [Backtest MAE], [Best Baseline MAE] )
+
+Direction Hit Rate =
+AVERAGE ( backtest_results[direction_correct] )
+
+Forecast Error (actual - forecast) =
+AVERAGEX ( backtest_results, backtest_results[actual] - backtest_results[forecast] )

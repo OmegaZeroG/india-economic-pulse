@@ -1,0 +1,6 @@
+model,n_months,mae,direction_hit_pct,mae_improvement_vs_best_baseline_pct,label
+naive_last,29,2.241,,-19.2,Last month's value
+naive_mean12,29,1.88,71.4,0.0,12-month average
+pca_index,29,2.072,75.0,-10.2,PCA index
+regression,29,2.324,60.7,-23.6,Regression
+zscore_index,29,1.979,75.0,-5.3,Z-score index
