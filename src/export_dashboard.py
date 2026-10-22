@@ -51,7 +51,8 @@ def main() -> None:
     OUT.mkdir(parents=True, exist_ok=True)
     con = sqlite3.connect(pulse.DB)
 
-    g = pd.read_sql("SELECT month, indicator, yoy_pct FROM v_growth_monthly WHERE yoy_pct IS NOT NULL", con)
+    # charts start in Apr 2018, when every indicator has data (fuel history reaches back to 2000)
+    g = pd.read_sql("SELECT month, indicator, yoy_pct FROM v_growth_monthly WHERE yoy_pct IS NOT NULL AND month >= '2018-04-01'", con)
     g["label"] = g["indicator"].map(INDICATORS)
     g["yoy_pct"] = g["yoy_pct"].round(2)
     g[["month", "indicator", "label", "yoy_pct"]].to_csv(OUT / "growth.csv", index=False)

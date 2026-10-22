@@ -6,7 +6,7 @@
 **Partly, and the honest answer matters more than a flattering one.** Fuel and GST growth track official IIP growth closely when activity swings widely (diesel r = 0.85, gross GST r = 0.84 over 2019-26, still 0.83 and 0.64 without COVID months), and a simple index built from them cut forecast error by 18 to 21% against a 12-month-average baseline over 66 scored months. In calm periods it did **not**: on the current IIP series (29 scored months) the baseline was better (error 1.88 points vs 1.98 for the best index version), and scored only from Apr 2022 every index version lost to the baseline. UPI growth carries no signal (r = 0.1): it measures adoption, not activity.
 Read the one-page [memo](docs/memo.md), the [notebook](notebooks/03_index_and_backtest.ipynb) or the [data-quality log](docs/data_quality_log.md).
 
-**[Interactive dashboard](https://claude.ai/artifact/BQFyLe21ZmvZYpdcEA6Dav)** (headline, indicator drill-down and backtest scorecard; every figure links back to its data file). Its data files are built by `src/export_dashboard.py` into `powerbi/dashboard_data/`.
+**[Interactive dashboard](https://omegazerog.github.io/india-economic-pulse/)** (headline, indicator drill-down and backtest scorecard; each chart names its data file). Rebuild it with `python src/export_dashboard.py` then `python src/build_site.py`; it is served from `docs/index.html` by GitHub Pages.
 
 <!-- Add the Power BI headline screenshot here: ![Headline page](powerbi/screenshots/page1.png) -->
 

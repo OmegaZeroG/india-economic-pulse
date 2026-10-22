@@ -1,0 +1,384 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>India Economic Pulse</title>
+<meta name="description" content="Can UPI, GST and fuel data give an early read on Indian industrial output? An interactive view of the indicators, the index and an honest backtest.">
+<style>
+:root {
+  --bg: #f6f7f9; --panel: #ffffff; --fg: #1a2230; --muted: #5a6575; --line: #dde1e7;
+  --c1: #2b6cb0; --c2: #d9791f; --grid: #e7eaee; --ref: #9aa3af; --bad: #c0392b; --pop: #ffffff; --shadow: 0 6px 18px rgba(20, 30, 45, .14);
+  --serif: Georgia, "Times New Roman", serif; --sans: system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --bg: #12171e; --panel: #1a212b; --fg: #e7ebf1; --muted: #9ba7b7; --line: #2a3340;
+    --c1: #6fa8e6; --c2: #f2a25c; --grid: #252d38; --ref: #5f6b7a; --bad: #e66; --pop: #222b37; --shadow: 0 6px 18px rgba(0, 0, 0, .5); color-scheme: dark; }
+}
+:root[data-theme="dark"] { --bg: #12171e; --panel: #1a212b; --fg: #e7ebf1; --muted: #9ba7b7; --line: #2a3340;
+  --c1: #6fa8e6; --c2: #f2a25c; --grid: #252d38; --ref: #5f6b7a; --bad: #e66; --pop: #222b37; --shadow: 0 6px 18px rgba(0, 0, 0, .5); color-scheme: dark; }
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--sans); font-size: 15px; line-height: 1.5; }
+.wrap { max-width: 1180px; margin: 0 auto; padding: 24px max(16px, env(safe-area-inset-left, 0px)) 48px max(16px, env(safe-area-inset-right, 0px)); display: flex; flex-direction: column; gap: 16px; }
+h1 { font-family: var(--serif); font-weight: 400; font-size: clamp(1.7rem, 4vw, 2.3rem); margin: 0; line-height: 1.15; }
+h2 { font-size: 1.05rem; font-weight: 600; margin: 0; text-wrap: balance; }
+p { margin: 0; }
+.lede { font-size: 1.15rem; max-width: 60ch; text-wrap: balance; }
+.note { font-size: .82rem; color: var(--muted); max-width: 72ch; }
+.top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+.top a { color: var(--muted); font-size: .85rem; }
+header { display: flex; flex-direction: column; gap: 8px; }
+.tabs { display: flex; gap: 4px; flex-wrap: wrap; border-bottom: 1px solid var(--line); }
+.tab { font: inherit; background: none; border: 0; border-bottom: 2px solid transparent; padding: 8px 14px; color: var(--muted); cursor: pointer; margin-bottom: -1px; }
+.tab[aria-selected="true"] { color: var(--fg); border-bottom-color: var(--fg); font-weight: 600; }
+.tab:focus-visible, select:focus-visible, a:focus-visible { outline: 2px solid var(--c1); outline-offset: 2px; }
+.page { display: flex; flex-direction: column; gap: 16px; }
+.page[hidden] { display: none; }
+.grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr)); }
+.grid2 { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 24rem), 1fr)); }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 20px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.kpi-label { font-size: .8rem; color: var(--muted); }
+.big { font-family: var(--serif); font-size: 2.2rem; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.sub { font-size: .8rem; color: var(--muted); }
+.src { font-size: .72rem; color: var(--muted); }
+.src code { font-size: .72rem; }
+.chart { position: relative; min-height: 240px; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: .8rem; color: var(--muted); margin-bottom: 6px; }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.sw { display: inline-block; width: 14px; height: 3px; border-radius: 2px; }
+.tip { position: absolute; pointer-events: none; background: var(--pop); border: 1px solid var(--line); border-radius: 8px; box-shadow: var(--shadow); padding: 6px 10px; font-size: .78rem; white-space: nowrap; z-index: 2; top: 28px; }
+.tip .d { color: var(--muted); margin-bottom: 2px; }
+.tip .r { display: flex; gap: 6px; align-items: center; font-variant-numeric: tabular-nums; }
+svg { display: block; max-width: 100%; font-family: inherit; }
+.tw { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: .82rem; font-variant-numeric: tabular-nums; }
+th, td { text-align: right; padding: 6px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th:first-child, td:first-child { text-align: left; }
+th { color: var(--muted); font-weight: 600; }
+select { font: inherit; background: var(--panel); color: var(--fg); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; max-width: 100%; }
+.ctl { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: .82rem; color: var(--muted); }
+ul.limits { margin: 0; padding-left: 1.2em; display: flex; flex-direction: column; gap: 6px; max-width: 72ch; }
+.links { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: .85rem; }
+a { color: var(--c1); }
+footer { border-top: 1px solid var(--line); padding-top: 16px; display: flex; flex-direction: column; gap: 8px; }
+</style>
+</head>
+<body>
+<div class="wrap" id="app">
+  <header>
+    <div class="top">
+      <h1>India Economic Pulse</h1>
+      <a href="https://github.com/OmegaZeroG/india-economic-pulse">Code and method on GitHub</a>
+    </div>
+    <p class="lede">Fuel and GST growth follow official industrial output through big swings. In calm months, a plain trailing average is hard to beat.</p>
+    <p class="note">Public NPCI, PPAC, GSTN and MoSPI data, refreshed by hand, not live. Latest industrial output month: <b id="latest-month">&mdash;</b>.</p>
+  </header>
+
+  <nav class="tabs" role="tablist" aria-label="Dashboard pages">
+    <button class="tab" role="tab" id="tab-headline" data-page="headline" aria-selected="true">Headline</button>
+    <button class="tab" role="tab" id="tab-indicators" data-page="indicators" aria-selected="false">Indicators</button>
+    <button class="tab" role="tab" id="tab-backtest" data-page="backtest" aria-selected="false">Backtest scorecard</button>
+  </nav>
+
+  <section class="page" id="headline" aria-labelledby="tab-headline">
+    <div class="grid">
+      <div class="card"><span class="kpi-label">Industrial output growth, latest month</span><b class="big" id="k-iip">&mdash;</b><span class="sub">Year on year, official IIP, base 2022-23</span></div>
+      <div class="card"><span class="kpi-label">Trailing average growth</span><b class="big" id="k-avg">&mdash;</b><span class="sub">Mean of the last twelve months of IIP growth</span></div>
+      <div class="card"><span class="kpi-label">Activity index, latest month</span><b class="big" id="k-index">&mdash;</b><span class="sub">Standardised, zero is the sample average</span></div>
+      <div class="card"><span class="kpi-label">Index direction</span><b class="big" id="k-dir">&mdash;</b><span class="sub">Against the month before</span></div>
+    </div>
+
+    <div class="card">
+      <div><h2>The index follows industrial output only loosely in calm months</h2>
+        <p class="note">Monthly, current IIP series. Left axis: IIP growth. Right axis: the equal-weight z-score index of seven indicators.</p></div>
+      <div class="chart" id="chart-headline"></div>
+      <p class="src">Source: <code>index_monthly.csv</code>, from the gold table <code>index_monthly</code>.</p>
+    </div>
+
+    <div class="card">
+      <div><h2>Fuel and GST track industrial output; UPI growth does not</h2>
+        <p class="note">Correlation of each indicator's year-on-year growth with IIP growth, old IIP series. Each column narrows the period: the link weakens after 2022 and for some indicators disappears. UPI measures adoption, not activity.</p></div>
+      <div class="tw"><table id="tbl-corr"><thead><tr><th>Indicator</th><th>All months, Apr 2019 - Mar 2026</th><th>COVID months removed</th><th>Since Apr 2022</th><th>Since Apr 2023 (calm)</th></tr></thead><tbody></tbody></table></div>
+      <p class="src">Source: <code>correlations.csv</code>, computed by <code>src/export_dashboard.py</code> from the gold growth view.</p>
+    </div>
+
+    <div class="card">
+      <h2>Limits</h2>
+      <ul class="limits">
+        <li>The current industrial output series is short, and it cannot be joined to the old one: their growth rates correlate only weakly.</li>
+        <li>Most results rest on a few dozen monthly points, so small differences are within noise.</li>
+        <li>Recent GST and fuel figures are provisional, and a Diwali that moves between October and November distorts year-on-year comparisons.</li>
+        <li>Data is downloaded by hand and loaded with Python and SQL. There is no live feed and no live forecast.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="page" id="indicators" aria-labelledby="tab-indicators" hidden>
+    <div class="card">
+      <div><h2>Diesel, petrol and gross GST move with industrial output; UPI growth reflects adoption</h2>
+        <p class="note">Year-on-year growth of each monthly indicator.</p></div>
+      <div class="ctl"><label for="sel-indicator">Indicator</label><select id="sel-indicator"></select></div>
+      <div class="chart" id="chart-indicator"></div>
+      <p class="src">Source: <code>growth.csv</code>, from the SQL view <code>v_growth_monthly</code> (<code>LAG(value, 12)</code>).</p>
+    </div>
+    <div class="grid2">
+      <div class="card">
+        <div><h2>Latest reading by indicator</h2><p class="note">Year-on-year growth in each indicator's latest published month.</p></div>
+        <div class="tw"><table id="tbl-latest"><thead><tr><th>Indicator</th><th>Latest month</th><th>Growth, % year on year</th></tr></thead><tbody></tbody></table></div>
+        <p class="src">Source: <code>growth.csv</code>.</p>
+      </div>
+      <div class="card">
+        <div><h2>GST collected by state</h2><p class="note">Domestic gross GST excluding cess, Rs crore, fifteen largest states in <b id="gst-month">&mdash;</b>.</p></div>
+        <div class="chart" id="chart-gst"></div>
+        <p class="src">Source: <code>gst_state.csv</code>, from the gold table <code>fact_gst_state</code>.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="page" id="backtest" aria-labelledby="tab-backtest" hidden>
+    <div class="card">
+      <div><h2>No index version beat the trailing average on the current series</h2>
+        <p class="note">Mean absolute error in percentage points of IIP growth, each month forecast using only earlier months. Grey: naive baselines. Orange: index versions. Lower is better.</p></div>
+      <div class="chart" id="chart-mae"></div>
+      <div class="tw"><table id="tbl-summary"><thead><tr><th>Model</th><th>Scored months</th><th>Mean error, points</th><th>Direction right, %</th><th>Change in error vs better baseline, %</th></tr></thead><tbody></tbody></table></div>
+      <p class="src">Source: <code>backtest_summary.csv</code>, from the gold view <code>v_backtest_summary</code>.</p>
+    </div>
+    <div class="card">
+      <div><h2>Forecast against actual, month by month</h2><p class="note">Each forecast is made before that month's official figure and fitted only on earlier months.</p></div>
+      <div class="ctl"><label for="sel-model">Model</label><select id="sel-model"></select></div>
+      <div class="chart" id="chart-fc"></div>
+      <p class="src">Source: <code>backtest_results.csv</code>, from the gold table <code>backtest_results</code>.</p>
+    </div>
+    <div class="card">
+      <div><h2>The edge appears only when the 2020 to 2022 swings are in the test</h2>
+        <p class="note">Change in forecast error against the better naive baseline, in percent. Positive means the index was better. Score the same models only on later calm months and the sign flips.</p></div>
+      <div class="tw"><table id="tbl-regimes"><thead><tr><th>Test</th><th>Scored months</th><th>Z-score index</th><th>PCA index</th><th>Regression</th></tr></thead><tbody></tbody></table></div>
+      <p class="src">Source: <code>robustness.csv</code>, from <code>docs/results/robustness.csv</code>.</p>
+    </div>
+  </section>
+
+  <footer>
+    <div class="links">
+      <a href="https://github.com/OmegaZeroG/india-economic-pulse">GitHub repository</a>
+      <a href="https://github.com/OmegaZeroG/india-economic-pulse/blob/main/docs/memo.md">One-page memo</a>
+      <a href="https://github.com/OmegaZeroG/india-economic-pulse/blob/main/docs/architecture.md">Architecture (bronze, silver, gold)</a>
+      <a href="https://github.com/OmegaZeroG/india-economic-pulse/blob/main/docs/data_quality_log.md">Data-quality log</a>
+    </div>
+    <p class="note">Data from public Indian government and statutory sources (NPCI, PPAC, GSTN, MoSPI), used for non-commercial analysis. The code, data, method and every data-quality decision are in the repository.</p>
+  </footer>
+</div>
+
+<script id="site-data" type="application/json">/*__DATA__*/</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+<script>
+(() => {
+  const D = JSON.parse(document.getElementById('site-data').textContent);
+  const $ = (s, el = document) => el.querySelector(s);
+  const f1 = (v) => (+v).toFixed(1);
+  const f2 = (v) => (+v).toFixed(2);
+  const sg1 = (v) => (+v > 0 ? '+' : '') + (+v).toFixed(1);
+  const fmtM = d3.utcFormat('%b %Y');
+  const fmtT = d3.utcFormat("%b '%y");
+  const parseD = (s) => new Date(String(s).slice(0, 10) + 'T00:00:00Z');
+  const num = (v) => (v === '' || v == null || Number.isNaN(+v) ? null : +v);
+  const BLUE = 'var(--c1)', ORANGE = 'var(--c2)', GREY = 'var(--ref)';
+  const state = { indicator: 'Diesel', model: 'zscore_index', page: 'headline' };
+  const PAGES = ['headline', 'indicators', 'backtest'];
+
+  // ---- values worked out from the data files (same logic as the SQL and Python behind them)
+  const idx = D.index_monthly.slice().sort((a, b) => (a.month < b.month ? -1 : 1));
+  const last = idx[idx.length - 1], prev = idx[idx.length - 2];
+  const iip12 = idx.slice(-12).map((r) => +r.iip_yoy_pct);
+  const latest = { month: last.month, iip: +last.iip_yoy_pct, avg12: d3.mean(iip12), index: +last.zscore_index, dir: +last.zscore_index > +prev.zscore_index ? 'Rising' : 'Falling' };
+  const bestByInd = {};
+  D.growth.forEach((r) => { if (!bestByInd[r.indicator] || r.month > bestByInd[r.indicator].month) bestByInd[r.indicator] = r; });
+  const indicatorLatest = Object.values(bestByInd).sort((a, b) => b.yoy_pct - a.yoy_pct);
+  const gstMonth = D.gst_state.reduce((a, r) => (r.month > a ? r.month : a), '');
+  const gstTop = D.gst_state.filter((r) => r.month === gstMonth).sort((a, b) => b.gross_cr - a.gross_cr).slice(0, 15);
+  const regimes = (() => {
+    const out = {}, order = [];
+    D.robustness.forEach((r) => {
+      if (!out[r.variant]) { out[r.variant] = { variant: r.variant, n_months: r.n_months }; order.push(r.variant); }
+      const k = { zscore_index: 'zscore', pca_index: 'pca', regression: 'regression' }[r.model];
+      if (k) out[r.variant][k] = r.mae_improvement_vs_best_baseline_pct;
+    });
+    return order.map((v) => out[v]);
+  })();
+
+  const textW = (svg, str) => {
+    const t = svg.append('text').style('font-size', '.78rem').text(str);
+    const w = t.node().getComputedTextLength();
+    t.remove();
+    return w;
+  };
+  const legend = (el, items) => {
+    const lg = document.createElement('div');
+    lg.className = 'legend';
+    items.forEach((it) => {
+      const s = document.createElement('span'), sw = document.createElement('i');
+      sw.className = 'sw';
+      if (it.dash) { sw.style.height = '0'; sw.style.borderTop = '3px dashed ' + it.color; } else sw.style.background = it.color;
+      s.append(sw, document.createTextNode(it.name));
+      lg.append(s);
+    });
+    el.append(lg);
+  };
+
+  function lineChart(el, cfg) {
+    el.replaceChildren();
+    legend(el, cfg.series.map((s) => ({ name: s.name, color: s.color, dash: s.dash })));
+    const H = cfg.height || 260, W = Math.max(260, el.clientWidth);
+    const svg = d3.select(el).append('svg').attr('width', '100%').attr('viewBox', `0 0 ${W} ${H}`).attr('role', 'img').attr('aria-label', cfg.series.map((s) => s.name).join(' and '));
+    const L = cfg.series.filter((s) => s.axis !== 'r'), R = cfg.series.filter((s) => s.axis === 'r');
+    const ext = (arr) => {
+      const v = arr.flatMap((s) => s.pts.map((p) => p.y).filter((y) => y != null));
+      const lo = Math.min(0, d3.min(v)), hi = Math.max(0, d3.max(v)), pad = (hi - lo) * 0.06 || 1;
+      return [lo < 0 ? lo - pad : lo, hi + pad];
+    };
+    const yl = d3.scaleLinear(ext(L), [H - 26, 8]).nice();
+    const yr = R.length ? d3.scaleLinear(ext(R), [H - 26, 8]).nice() : null;
+    const tl = yl.ticks(5), tr = yr ? yr.ticks(5) : [];
+    const ml = Math.ceil(d3.max(tl, (v) => textW(svg, String(v)))) + 14;
+    const mr = yr ? Math.ceil(d3.max(tr, (v) => textW(svg, String(v)))) + 14 : 12;
+    const xs = cfg.series.flatMap((s) => s.pts.map((p) => +p.x));
+    const x = d3.scaleUtc([new Date(d3.min(xs)), new Date(d3.max(xs))], [ml, W - mr]);
+    const g = svg.append('g');
+    const txt = (sel) => sel.style('font-size', '.78rem').style('fill', 'var(--muted)');
+    tl.forEach((v) => {
+      g.append('line').attr('x1', ml).attr('x2', W - mr).attr('y1', yl(v)).attr('y2', yl(v)).style('stroke', 'var(--grid)').attr('stroke-width', 1);
+      txt(g.append('text').attr('x', ml - 8).attr('y', yl(v) + 4).attr('text-anchor', 'end').text(v));
+    });
+    tr.forEach((v) => txt(g.append('text').attr('x', W - mr + 8).attr('y', yr(v) + 4).text(v)));
+    if (yl.domain()[0] < 0) g.append('line').attr('x1', ml).attr('x2', W - mr).attr('y1', yl(0)).attr('y2', yl(0)).style('stroke', 'var(--ref)').attr('stroke-width', 1).attr('stroke-dasharray', '4 3');
+    x.ticks(Math.max(3, Math.floor((W - ml - mr) / 80))).forEach((t) => txt(g.append('text').attr('x', x(t)).attr('y', H - 6).attr('text-anchor', 'middle').text(fmtT(t))));
+    g.append('line').attr('x1', ml).attr('x2', W - mr).attr('y1', H - 26).attr('y2', H - 26).style('stroke', 'var(--ref)').attr('stroke-width', 1);
+    cfg.series.forEach((s) => {
+      const y = s.axis === 'r' ? yr : yl;
+      const line = d3.line().x((p) => x(p.x)).y((p) => y(p.y)).defined((p) => p.y != null);
+      g.append('path').attr('d', line(s.pts)).attr('fill', 'none').style('stroke', s.color).attr('stroke-width', 2)
+        .attr('stroke-linecap', s.dash ? 'butt' : 'round').attr('stroke-linejoin', 'round').attr('stroke-dasharray', s.dash ? '5 4' : null);
+      const lp = s.pts[s.pts.length - 1];
+      if (lp && lp.y != null) g.append('circle').attr('cx', x(lp.x)).attr('cy', y(lp.y)).attr('r', 3).style('fill', s.color);
+    });
+    const rule = g.append('line').attr('y1', 8).attr('y2', H - 26).style('stroke', 'var(--ref)').attr('stroke-width', 1).style('display', 'none');
+    const dots = cfg.series.map((s) => g.append('circle').attr('r', 4).style('fill', s.color).style('display', 'none'));
+    const tip = document.createElement('div');
+    tip.className = 'tip';
+    tip.style.display = 'none';
+    el.append(tip);
+    const times = [...new Set(xs)].sort((a, b) => a - b);
+    const move = (event) => {
+      const box = svg.node().getBoundingClientRect();
+      const px = ((event.clientX - box.left) / box.width) * W;
+      const when = times[d3.bisector((d) => d).center(times, +x.invert(Math.min(Math.max(px, ml), W - mr)))];
+      rule.attr('x1', x(new Date(when))).attr('x2', x(new Date(when))).style('display', null);
+      tip.replaceChildren();
+      const d = document.createElement('div');
+      d.className = 'd';
+      d.textContent = fmtM(new Date(when));
+      tip.append(d);
+      cfg.series.forEach((s, k) => {
+        const p = s.pts.find((q) => +q.x === when), y = s.axis === 'r' ? yr : yl;
+        if (p && p.y != null) {
+          dots[k].attr('cx', x(p.x)).attr('cy', y(p.y)).style('display', null);
+          const r = document.createElement('div'), sw = document.createElement('i');
+          r.className = 'r';
+          sw.className = 'sw';
+          sw.style.background = s.color;
+          r.append(sw, document.createTextNode(s.name.replace(/ \(.*\)$/, '') + ': ' + (s.fmt ? s.fmt(p.y) : f1(p.y))));
+          tip.append(r);
+        } else dots[k].style('display', 'none');
+      });
+      tip.style.display = '';
+      tip.style.left = Math.max(0, Math.min(el.clientWidth - tip.offsetWidth, (x(new Date(when)) / W) * box.width + 12)) + 'px';
+    };
+    const leave = () => { rule.style('display', 'none'); dots.forEach((d) => d.style('display', 'none')); tip.style.display = 'none'; };
+    svg.append('rect').attr('x', ml).attr('y', 0).attr('width', W - ml - mr).attr('height', H - 26).attr('fill', 'transparent').on('pointermove', move).on('pointerleave', leave);
+  }
+
+  function barChart(el, rows) {
+    el.replaceChildren();
+    el.style.minHeight = '0';
+    const W = Math.max(260, el.clientWidth), rowH = 28, H = rows.length * rowH + 6;
+    const svg = d3.select(el).append('svg').attr('width', '100%').attr('viewBox', `0 0 ${W} ${H}`).attr('role', 'img');
+    const nameW = Math.min(W * 0.45, Math.ceil(d3.max(rows, (r) => textW(svg, r.name))) + 12);
+    const valW = Math.ceil(d3.max(rows, (r) => textW(svg, r.text))) + 10;
+    const x = d3.scaleLinear([0, d3.max(rows, (r) => r.value)], [0, Math.max(10, W - nameW - valW)]);
+    rows.forEach((r, i) => {
+      const y = i * rowH + 3;
+      svg.append('text').attr('x', nameW - 8).attr('y', y + rowH / 2 + 1).attr('text-anchor', 'end').style('font-size', '.78rem').style('fill', 'var(--fg)').text(r.name);
+      svg.append('rect').attr('x', nameW).attr('y', y + 3).attr('width', Math.max(1, x(r.value))).attr('height', rowH - 10).attr('rx', 4).style('fill', r.color);
+      svg.append('text').attr('x', nameW + x(r.value) + 6).attr('y', y + rowH / 2 + 1).style('font-size', '.78rem').style('fill', 'var(--muted)').text(r.text);
+    });
+  }
+
+  function fillTable(tbl, rows, cells) {
+    const tb = tbl.tBodies[0];
+    tb.replaceChildren();
+    rows.forEach((r) => { const tr = tb.insertRow(); cells.forEach((c) => { tr.insertCell().textContent = c(r); }); });
+  }
+
+  function fillOptions(sel, options, value) {
+    if ([...sel.options].map((o) => o.value).join('|') !== options.map((o) => o.value).join('|')) sel.replaceChildren(...options.map((o) => new Option(o.label, o.value)));
+    sel.value = value;
+  }
+
+  function render() {
+    $('#latest-month').textContent = fmtM(parseD(latest.month));
+    $('#k-iip').textContent = f1(latest.iip) + '%';
+    $('#k-avg').textContent = f1(latest.avg12) + '%';
+    $('#k-index').textContent = f2(latest.index);
+    $('#k-dir').textContent = latest.dir;
+
+    if (state.page === 'headline') {
+      lineChart($('#chart-headline'), { height: 280, series: [
+        { name: 'IIP growth (% year on year)', color: BLUE, axis: 'l', fmt: (v) => f1(v) + '%', pts: idx.map((r) => ({ x: parseD(r.month), y: num(r.iip_yoy_pct) })) },
+        { name: 'Activity index (right axis)', color: ORANGE, axis: 'r', fmt: f2, pts: idx.map((r) => ({ x: parseD(r.month), y: num(r.zscore_index) })) },
+      ] });
+      const cols = ['All months, Apr 2019 - Mar 2026', 'COVID months removed', 'Since Apr 2022', 'Since Apr 2023 (calm)'];
+      fillTable($('#tbl-corr'), D.correlations, [(r) => r.label, ...cols.map((c) => (r) => f2(r[c]))]);
+    }
+    if (state.page === 'indicators') {
+      const labels = [...new Set(D.growth.map((r) => r.label))];
+      if (!labels.includes(state.indicator)) state.indicator = labels[0];
+      fillOptions($('#sel-indicator'), labels.map((l) => ({ value: l, label: l })), state.indicator);
+      const pts = D.growth.filter((r) => r.label === state.indicator).sort((a, b) => (a.month < b.month ? -1 : 1)).map((r) => ({ x: parseD(r.month), y: num(r.yoy_pct) }));
+      lineChart($('#chart-indicator'), { height: 280, series: [{ name: state.indicator + ', % year on year', color: BLUE, axis: 'l', fmt: (v) => f1(v) + '%', pts }] });
+      fillTable($('#tbl-latest'), indicatorLatest, [(r) => r.label, (r) => fmtM(parseD(r.month)), (r) => sg1(r.yoy_pct)]);
+      $('#gst-month').textContent = fmtM(parseD(gstMonth));
+      barChart($('#chart-gst'), gstTop.map((r) => ({ name: r.state, value: +r.gross_cr, text: d3.format(',.0f')(r.gross_cr), color: BLUE })));
+    }
+    if (state.page === 'backtest') {
+      const s = D.backtest_summary;
+      barChart($('#chart-mae'), s.map((r) => ({ name: r.label, value: +r.mae, text: f2(r.mae), color: r.model.startsWith('naive') ? GREY : ORANGE })));
+      fillTable($('#tbl-summary'), s, [(r) => r.label, (r) => r.n_months, (r) => f2(r.mae), (r) => (num(r.direction_hit_pct) == null ? '—' : f1(r.direction_hit_pct)), (r) => sg1(r.mae_improvement_vs_best_baseline_pct)]);
+      fillOptions($('#sel-model'), s.map((r) => ({ value: r.model, label: r.label })), state.model);
+      const by = (m) => D.backtest_results.filter((r) => r.model === m).sort((a, b) => (a.month < b.month ? -1 : 1));
+      const sel = by(state.model), base = by('naive_mean12');
+      const series = [{ name: 'Actual IIP growth', color: BLUE, axis: 'l', fmt: (v) => f1(v) + '%', pts: sel.map((r) => ({ x: parseD(r.month), y: num(r.actual) })) },
+                      { name: ((sel[0] && sel[0].label) || 'Model') + ' forecast', color: ORANGE, axis: 'l', fmt: (v) => f1(v) + '%', pts: sel.map((r) => ({ x: parseD(r.month), y: num(r.forecast) })) }];
+      if (state.model !== 'naive_mean12') series.push({ name: '12-month average forecast', color: GREY, dash: true, axis: 'l', fmt: (v) => f1(v) + '%', pts: base.map((r) => ({ x: parseD(r.month), y: num(r.forecast) })) });
+      lineChart($('#chart-fc'), { height: 280, series });
+      fillTable($('#tbl-regimes'), regimes, [(r) => r.variant, (r) => r.n_months, (r) => sg1(r.zscore), (r) => sg1(r.pca), (r) => sg1(r.regression)]);
+    }
+  }
+
+  function show(id, fromHash) {
+    if (!PAGES.includes(id)) id = 'headline';
+    state.page = id;
+    PAGES.forEach((p) => { $('#' + p).hidden = p !== id; $('#tab-' + p).setAttribute('aria-selected', String(p === id)); });
+    if (!fromHash) history.replaceState(null, '', '#' + id);
+    render();
+  }
+  document.querySelectorAll('.tab').forEach((b) => b.addEventListener('click', () => show(b.dataset.page)));
+  $('#sel-indicator').addEventListener('change', (e) => { state.indicator = e.target.value; render(); });
+  $('#sel-model').addEventListener('change', (e) => { state.model = e.target.value; render(); });
+  window.addEventListener('hashchange', () => show(location.hash.slice(1), true));
+  let t;
+  window.addEventListener('resize', () => { clearTimeout(t); t = setTimeout(render, 120); });
+  show(location.hash.slice(1) || 'headline', true);
+})();
+</script>
+</body>
+</html>
