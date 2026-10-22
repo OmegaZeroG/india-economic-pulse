@@ -97,11 +97,26 @@ def parse_national(path) -> pd.DataFrame:
 
 
 # ----------------------------------------------------------------------------- state workbooks
+_MONTH_TEXT = re.compile(r"^([A-Za-z]{3})[a-z]*[-' ](\d{2}|\d{4})$")
+
+
+def _as_month(v) -> pd.Timestamp | None:
+    """A month header cell: a real date, or text like 'Apr-18' / 'April 2018'. Anything else is None."""
+    if hasattr(v, "year"):
+        return pd.Timestamp(v).to_period("M").to_timestamp()
+    m = _MONTH_TEXT.match(str(v).strip())
+    if not m:
+        return None
+    y = int(m.group(2))
+    return pd.to_datetime(f"{m.group(1)} {y + 2000 if y < 100 else y}", format="%b %Y")
+
+
 def _blocks(sheet: pd.DataFrame):
     """Return (header_row, {month: {label: column}}) using the CGST/SGST/IGST/[CESS]/TOTAL sub-header."""
-    for i in range(min(12, len(sheet))):
-        starts = {pd.Timestamp(v).to_period("M").to_timestamp(): j
-                  for j, v in sheet.iloc[i].items() if hasattr(v, "year")}
+    for i in range(min(12, len(sheet) - 1)):
+        below = sheet.iloc[i + 1].astype(str).str.strip().str.upper()
+        starts = {_as_month(v): j for j, v in sheet.iloc[i].items()
+                  if _as_month(v) is not None and below.iloc[j] == "CGST"}
         if starts:
             sub = sheet.iloc[i + 1].astype(str).str.strip().str.upper()
             out = {}
@@ -121,16 +136,49 @@ def _num(sheet, i, col):
     return pd.to_numeric(sheet.iloc[i, col], errors="coerce")
 
 
-def parse_all_india_domestic_gross(sheet: pd.DataFrame) -> pd.DataFrame:
-    """Per month: cgst+sgst+igst of 'Domestic' and of 'Gross Revenue' (ex-cess), from the All-India sheet."""
+def _find_sheet(book: dict, *needles: str, exclude: tuple = ()) -> pd.DataFrame:
+    """Pick the sheet whose lower-case name contains every needle (older workbooks name sheets differently)."""
+    for name, sh in book.items():
+        low = name.lower()
+        if all(n in low for n in needles) and not any(e in low for e in exclude):
+            return sh
+    raise KeyError(f"no sheet with {needles} in {list(book)}")
+
+
+def parse_all_india(sheet: pd.DataFrame) -> pd.DataFrame:
+    """National monthly series from the All-India sheet of a state workbook.
+
+    Same columns as the national workbook gives (see module docstring). Used for the checks and for months
+    the national workbook does not cover (before Apr 2023). cess_cr is NaN where the sheet has no CESS column.
+    """
     hdr, blocks = _blocks(sheet)
     lab = sheet.iloc[:, 0].astype(str).str.strip().str.lower()
-    dom, gross = lab[lab == "domestic"].index[0], lab[lab == "gross revenue"].index[0]
-    return pd.DataFrame([{
-        "month": m.strftime("%Y-%m-%d"),
-        "domestic_exc_cess": sum(_num(sheet, dom, c[k]) for k in ("CGST", "SGST", "IGST")),
-        "gross_exc_cess": sum(_num(sheet, gross, c[k]) for k in ("CGST", "SGST", "IGST"))}
-        for m, c in blocks.items()])
+
+    def find(*prefixes):
+        for p in prefixes:
+            hit = lab[lab.str.startswith(p)]
+            if len(hit):
+                return hit.index[0]
+        return None
+
+    # FY2020-21 onward has an All-India sheet with refunds and net. FY2017-18 to FY2019-20 workbooks only
+    # have the collections sheet, whose bottom rows give domestic (Grand Total) and gross; no refunds exist.
+    row = {"domestic": find("domestic", "grand total"), "gross": find("gross revenue"),
+           "refunds": find("total refund"), "net": find("net gst revenue")}
+    nan = float("nan")
+    rows = []
+    for m, c in blocks.items():
+        ex = lambda r: nan if r is None else sum(_num(sheet, r, c[k]) for k in ("CGST", "SGST", "IGST"))
+        tot = lambda r: nan if r is None else _num(sheet, r, c["TOTAL"])
+        rows.append({
+            "month": m.strftime("%Y-%m-%d"),
+            "cgst_cr": _num(sheet, row["gross"], c["CGST"]), "sgst_cr": _num(sheet, row["gross"], c["SGST"]),
+            "igst_cr": _num(sheet, row["gross"], c["IGST"]),
+            "cess_cr": _num(sheet, row["gross"], c["CESS"]) if "CESS" in c else nan,
+            "gross_cr": tot(row["gross"]), "refunds_cr": tot(row["refunds"]), "net_cr": tot(row["net"]),
+            "domestic_ex_cess_cr": ex(row["domestic"]), "gross_ex_cess_cr": ex(row["gross"]),
+            "refunds_ex_cess_cr": ex(row["refunds"]), "net_ex_cess_cr": ex(row["net"])})
+    return pd.DataFrame(rows)
 
 
 def parse_states(sheet: pd.DataFrame, name: str) -> pd.DataFrame:
@@ -151,11 +199,19 @@ def parse_states(sheet: pd.DataFrame, name: str) -> pd.DataFrame:
 
 def load_state_year(path):
     x = pd.read_excel(path, header=None, sheet_name=None)
-    col = parse_states(x["Collections-Statewise"], "gross_cr")
-    ref = parse_states(x["Refund-Statewise"], "refunds_cr")[["month", "state_code", "refunds_cr"]]
-    st = col.merge(ref, on=["month", "state_code"], how="left")
+    coll = _find_sheet(x, "collection")
+    col = parse_states(coll, "gross_cr")
+    try:
+        ref = parse_states(_find_sheet(x, "refund", exclude=("india",)), "refunds_cr")[["month", "state_code", "refunds_cr"]]
+        st = col.merge(ref, on=["month", "state_code"], how="left")
+    except KeyError:                       # FY2017-18 to FY2019-20: no refund sheet, left blank (never filled)
+        st = col.assign(refunds_cr=float("nan"))
     st["net_cr"] = st["gross_cr"] - st["refunds_cr"]
-    return parse_all_india_domestic_gross(x["GST_Revenue-All_India"]), st
+    try:
+        national = parse_all_india(_find_sheet(x, "india"))
+    except KeyError:
+        national = parse_all_india(coll)
+    return national, st
 
 
 # ----------------------------------------------------------------------------- checks
@@ -168,7 +224,7 @@ def run_checks(nat: pd.DataFrame, st: pd.DataFrame, allindia: pd.DataFrame) -> i
     tot = st.groupby("month")["gross_cr"].sum()
     for _, r in allindia.iterrows():
         n += 2
-        d = _rel(tot.get(r["month"], float("nan")), r["domestic_exc_cess"])
+        d = _rel(tot.get(r["month"], float("nan")), r["domestic_ex_cess_cr"])
         if not d <= TOL:
             bad += 1
             log_issue("GST", f"{r['month'][:7]}: state rows differ from All-India domestic by {d:.2%}",
@@ -176,14 +232,14 @@ def run_checks(nat: pd.DataFrame, st: pd.DataFrame, allindia: pd.DataFrame) -> i
         nr = nat[nat["month"] == r["month"]]
         if len(nr):
             x = nr.iloc[0]
-            d2 = _rel(x["cgst_cr"] + x["sgst_cr"] + x["igst_cr"], r["gross_exc_cess"])
+            d2 = _rel(x["cgst_cr"] + x["sgst_cr"] + x["igst_cr"], r["gross_ex_cess_cr"])
             if not d2 <= TOL:
                 bad += 1
                 log_issue("GST", f"{r['month'][:7]}: national workbook vs state workbook gross (ex-cess) "
                           f"differ by {d2:.2%}", "check revision between releases")
     for _, r in nat.iterrows():
         n += 1
-        if _rel(r["gross_cr"] - r["refunds_cr"], r["net_cr"]) > TOL:
+        if pd.notna(r["net_cr"]) and _rel(r["gross_cr"] - r["refunds_cr"], r["net_cr"]) > TOL:
             bad += 1
             log_issue("GST", f"{r['month'][:7]}: gross - refunds != net", "inspect source workbook")
     print(f"checks: {n} comparisons, {bad} outside {TOL:.1%}")
@@ -199,6 +255,15 @@ def main() -> None:
     parts = [load_state_year(p) for p in st_files]
     allindia = pd.concat([a for a, _ in parts])
     st = pd.concat([s for _, s in parts])
+    # The national workbook only reaches back to Apr 2023. Earlier months come from the All-India sheet of the
+    # state workbooks, which carries the same rows (checked on overlapping months in docs/data_quality_log.md).
+    older = allindia[~allindia["month"].isin(nat["month"])]
+    if len(older):
+        first = nat["month"].min()[:7]
+        nat = pd.concat([nat, older]).sort_values("month").reset_index(drop=True)
+        log_issue("GST", f"national months before {first} come from the All-India sheet of the state workbooks "
+                  f"(the national workbook starts {first})",
+                  "same row definitions; cess_cr blank where the sheet has no CESS column", str(len(older)))
     names = st.sort_values("month").drop_duplicates("state_code", keep="last").set_index("state_code")["state"]
     st["state"] = st["state_code"].map(names)
     failed = run_checks(nat, st, allindia)
