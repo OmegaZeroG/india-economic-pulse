@@ -1,32 +1,35 @@
-"""Load GST tables from the Excel files downloaded from the GST portal's Statistics page.
+"""SILVER: GST tables, built from the bronze copies of the Excel files downloaded from the GST portal.
 
-Inputs (data/raw):
-  gst_national_FY*_*.xlsx  monthly sheets (Apr-24 ... Aug-26) with this year and the same month a
-                           year earlier, so one file covers Apr 2023 - Aug 2026. Includes CESS.
-  gst_state_FY*_*.xlsx     one per financial year: All-India, state-wise collection, state-wise refund.
+Bronze sources:
+  gst_national  monthly sheets (Apr-24 ... Aug-26) with this year and the same month a year earlier, so one file
+                covers Apr 2023 - Aug 2026. Includes CESS.
+  gst_state     one workbook per financial year: All-India, state-wise collection, state-wise refund.
 
-Outputs (data/clean):
-  fact_gst_national.csv  month, cgst_cr, sgst_cr, igst_cr, cess_cr, gross_cr, refunds_cr, net_cr,
-                         domestic_ex_cess_cr, gross_ex_cess_cr, refunds_ex_cess_cr, net_ex_cess_cr
-                         (gross = domestic + imports, *_cr includes cess; *_ex_cess_cr is CGST+SGST+IGST
-                         only, the consistent series across the Mar 2026 end of compensation cess)
-  fact_gst_state.csv     month, state_code, state, cgst_cr, sgst_cr, igst_cr, gross_cr, refunds_cr, net_cr
-                         DOMESTIC collections EXCLUDING cess: the state workbooks stopped publishing
-                         cess after FY2024-25 (compensation cess was being phased out), so cess is left
-                         out of every state month to keep the series consistent.
+Silver outputs:
+  silver_gst_national  month, cgst_cr, sgst_cr, igst_cr, cess_cr, gross_cr, refunds_cr, net_cr,
+                       domestic_ex_cess_cr, gross_ex_cess_cr, refunds_ex_cess_cr, net_ex_cess_cr, source_file
+                       (gross = domestic + imports, *_cr includes cess; *_ex_cess_cr is CGST+SGST+IGST
+                       only, the consistent series across the Mar 2026 end of compensation cess)
+  silver_gst_state     month, state_code, state, cgst_cr, sgst_cr, igst_cr, gross_cr, refunds_cr, net_cr, source_file
+                       DOMESTIC collections EXCLUDING cess: the state workbooks stopped publishing
+                       cess after FY2024-25 (compensation cess was being phased out), so cess is left
+                       out of every state month to keep the series consistent.
 
 Checks written to docs/data_quality_log.md (tolerance 0.5 per cent):
   1. sum of state rows equals the All-India domestic row of the same workbook
   2. national series (national workbook) equals the All-India gross, ex-cess, of the state workbook
   3. gross - refunds = net in the national series
 
-Usage:  python src/ingest/gst.py
+Usage:  python src/silver/gst.py       (normally run through src/silver/build_silver.py)
 """
 import re
+import sys
+from pathlib import Path
 
 import pandas as pd
 
-from common import CLEAN, RAW, log_issue, upsert
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from common import bronze_files, bronze_sheets, connect, log_issue, replace_table  # noqa: E402
 
 TOL = 0.005
 STATE_FIX = {"CBIC": "OIDAR"}  # state code 99 was labelled CBIC in FY2023-24, OIDAR afterwards
@@ -52,9 +55,9 @@ def _cur_prev_cols(sheet: pd.DataFrame) -> tuple[int, int]:
     return 2, 1
 
 
-def parse_national(path) -> pd.DataFrame:
+def parse_national(sheets: dict) -> pd.DataFrame:
     rows = {}
-    for name, sh in pd.read_excel(path, header=None, sheet_name=None).items():
+    for name, sh in sheets.items():
         month = _sheet_month(name)
         if month is None:
             continue
@@ -197,8 +200,7 @@ def parse_states(sheet: pd.DataFrame, name: str) -> pd.DataFrame:
     return pd.DataFrame(out)
 
 
-def load_state_year(path):
-    x = pd.read_excel(path, header=None, sheet_name=None)
+def load_state_year(x: dict):
     coll = _find_sheet(x, "collection")
     col = parse_states(coll, "gross_cr")
     try:
@@ -246,15 +248,24 @@ def run_checks(nat: pd.DataFrame, st: pd.DataFrame, allindia: pd.DataFrame) -> i
     return bad
 
 
-def main() -> None:
-    nat_files = sorted(RAW.glob("gst_national_FY*.xlsx"))
-    st_files = sorted(RAW.glob("gst_state_FY*.xlsx"))
+def build(con) -> None:
+    nat_files = bronze_files(con, "gst_national")
+    st_files = bronze_files(con, "gst_state")
     if not nat_files or not st_files:
-        raise SystemExit("Need gst_national_FY*.xlsx and gst_state_FY*.xlsx in data/raw")
-    nat = pd.concat([parse_national(p) for p in nat_files]).drop_duplicates("month", keep="last")
-    parts = [load_state_year(p) for p in st_files]
-    allindia = pd.concat([a for a, _ in parts])
-    st = pd.concat([s for _, s in parts])
+        raise SystemExit("Need gst_national and gst_state files in bronze (run src/bronze/load_bronze.py)")
+    nat_parts = []
+    for fid, name, _ in nat_files:
+        d = parse_national(bronze_sheets(con, fid))
+        d["source_file"] = name
+        nat_parts.append(d)
+    nat = pd.concat(nat_parts).drop_duplicates("month", keep="last")
+    all_parts, st_parts = [], []
+    for fid, name, _ in st_files:
+        national, st_year = load_state_year(bronze_sheets(con, fid))
+        national["source_file"], st_year["source_file"] = name, name
+        all_parts.append(national)
+        st_parts.append(st_year)
+    allindia, st = pd.concat(all_parts), pd.concat(st_parts)
     # The national workbook only reaches back to Apr 2023. Earlier months come from the All-India sheet of the
     # state workbooks, which carries the same rows (checked on overlapping months in docs/data_quality_log.md).
     older = allindia[~allindia["month"].isin(nat["month"])]
@@ -267,12 +278,16 @@ def main() -> None:
     names = st.sort_values("month").drop_duplicates("state_code", keep="last").set_index("state_code")["state"]
     st["state"] = st["state_code"].map(names)
     failed = run_checks(nat, st, allindia)
-    n1 = upsert(nat, CLEAN / "fact_gst_national.csv", ["month"])
-    n2 = upsert(st, CLEAN / "fact_gst_state.csv", ["month", "state_code"])
-    print(f"fact_gst_national.csv: {n1} rows ({nat['month'].min()} to {nat['month'].max()})")
-    print(f"fact_gst_state.csv: {n2} rows, {st['state_code'].nunique()} states/territories, "
+    nat_cols = ["month", "cgst_cr", "sgst_cr", "igst_cr", "cess_cr", "gross_cr", "refunds_cr", "net_cr",
+                "domestic_ex_cess_cr", "gross_ex_cess_cr", "refunds_ex_cess_cr", "net_ex_cess_cr", "source_file"]
+    n1 = replace_table(con, "silver_gst_national", nat[nat_cols])
+    n2 = replace_table(con, "silver_gst_state", st)
+    print(f"silver_gst_national: {n1} rows ({nat['month'].min()} to {nat['month'].max()})")
+    print(f"silver_gst_state: {n2} rows, {st['state_code'].nunique()} states/territories, "
           f"{st['month'].nunique()} months; failed checks: {failed}")
 
 
 if __name__ == "__main__":
-    main()
+    con = connect()
+    build(con)
+    con.commit()

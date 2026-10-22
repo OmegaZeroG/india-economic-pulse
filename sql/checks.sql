@@ -1,4 +1,4 @@
--- Five data checks, run after every load by src/run_checks.py.
+-- Seven data checks across the layers (silver-to-gold, gold content, bronze loading, lineage), run after every build by src/run_checks.py.
 -- Each block starts with "-- CHECK <name>: <what it proves>" and is one query returning a single
 -- number: how many rows break the rule. 0 = pass. Failures are written to docs/data_quality_log.md.
 
@@ -49,20 +49,35 @@ SELECT COUNT(*) AS failures FROM (
     WHERE ABS(s.state_sum - n.domestic_ex_cess_cr) > 0.005 * n.domestic_ex_cess_cr
 );
 
--- CHECK row_counts_match_source: rows loaded into each table equal the rows in its clean CSV
+-- CHECK row_counts_match_silver: every gold table holds exactly the rows of the silver table it was built from
 SELECT COUNT(*) AS failures FROM (
-    SELECT l.table_name FROM load_log l
-    JOIN (SELECT 'fact_upi' AS t, COUNT(*) AS n FROM fact_upi
-          UNION ALL SELECT 'fact_gst_national', COUNT(*) FROM fact_gst_national
-          UNION ALL SELECT 'fact_gst_state', COUNT(*) FROM fact_gst_state
-          UNION ALL SELECT 'fact_fuel', COUNT(*) FROM fact_fuel
-          UNION ALL SELECT 'fact_ewaybill_national', COUNT(*) FROM fact_ewaybill_national
-          UNION ALL SELECT 'fact_ewaybill_state', COUNT(*) FROM fact_ewaybill_state
-          UNION ALL SELECT 'fact_iip', COUNT(*) FROM fact_iip
-          UNION ALL SELECT 'fact_gdp', COUNT(*) FROM fact_gdp) c ON c.t = l.table_name
-    WHERE c.n <> l.csv_rows
+    SELECT 'upi' AS t FROM (SELECT (SELECT COUNT(*) FROM silver_upi) AS s, (SELECT COUNT(*) FROM fact_upi) AS g) WHERE s <> g
+    UNION ALL SELECT 'gst_national' FROM (SELECT (SELECT COUNT(*) FROM silver_gst_national) AS s, (SELECT COUNT(*) FROM fact_gst_national) AS g) WHERE s <> g
+    UNION ALL SELECT 'gst_state' FROM (SELECT (SELECT COUNT(*) FROM silver_gst_state) AS s, (SELECT COUNT(*) FROM fact_gst_state) AS g) WHERE s <> g
+    UNION ALL SELECT 'fuel' FROM (SELECT (SELECT COUNT(*) FROM silver_fuel) AS s, (SELECT COUNT(*) FROM fact_fuel) AS g) WHERE s <> g
+    UNION ALL SELECT 'ewaybill_state' FROM (SELECT (SELECT COUNT(*) FROM silver_ewaybill_state) AS s, (SELECT COUNT(*) FROM fact_ewaybill_state) AS g) WHERE s <> g
+    UNION ALL SELECT 'ewaybill_national' FROM (SELECT (SELECT COUNT(DISTINCT month) FROM silver_ewaybill_state) AS s, (SELECT COUNT(*) FROM fact_ewaybill_national) AS g) WHERE s <> g
+    UNION ALL SELECT 'iip' FROM (SELECT (SELECT COUNT(*) FROM silver_iip) AS s, (SELECT COUNT(*) FROM fact_iip) AS g) WHERE s <> g
+    UNION ALL SELECT 'gdp' FROM (SELECT (SELECT COUNT(*) FROM silver_gdp) AS s, (SELECT COUNT(*) FROM fact_gdp) AS g) WHERE s <> g
 );
 
 -- CHECK growth_in_plausible_range: YoY growth stays between -60% and +100% in the project window (from Apr 2023)
 SELECT COUNT(*) AS failures FROM v_growth_monthly
 WHERE month >= '2023-04-01' AND yoy_pct IS NOT NULL AND yoy_pct NOT BETWEEN -60 AND 100;
+
+-- CHECK bronze_files_fully_loaded: every bronze file stored at least one record and exactly the number it reports
+SELECT COUNT(*) AS failures FROM bronze_files f
+WHERE f.n_records = 0
+   OR f.n_records <> (SELECT COUNT(*) FROM bronze_cells c WHERE c.file_id = f.file_id)
+                   + (SELECT COUNT(*) FROM bronze_api a WHERE a.file_id = f.file_id);
+
+-- CHECK silver_rows_traceable: every silver row names a bronze file that exists
+SELECT COUNT(*) AS failures FROM (
+    SELECT source_file FROM silver_upi
+    UNION ALL SELECT source_file FROM silver_fuel
+    UNION ALL SELECT source_file FROM silver_gst_national
+    UNION ALL SELECT source_file FROM silver_gst_state
+    UNION ALL SELECT source_file FROM silver_ewaybill_state
+    UNION ALL SELECT source_file FROM silver_iip
+    UNION ALL SELECT source_file FROM silver_gdp
+) WHERE source_file NOT IN (SELECT file_name FROM bronze_files);

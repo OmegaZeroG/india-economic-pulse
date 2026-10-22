@@ -1,7 +1,8 @@
--- India Economic Pulse: star schema (SQLite).
+-- GOLD layer: the star schema reporting reads (SQLite). Built from the silver tables by sql/gold_load.sql.
+-- India Economic Pulse star schema.
 -- Every monthly fact joins to dim_date on the first day of the month (text, ISO yyyy-mm-dd).
 -- Units are kept as published and named in the column: _mn = millions, _cr = Rs crore, _kt = thousand tonnes.
--- Re-running this file is safe (IF NOT EXISTS); data is loaded by src/load_db.py with upserts.
+-- Re-running this file is safe (IF NOT EXISTS); facts are refilled from silver by sql/gold_load.sql (src/gold/build_gold.py).
 
 PRAGMA foreign_keys = ON;
 
@@ -95,14 +96,6 @@ CREATE TABLE IF NOT EXISTS fact_gdp (
     PRIMARY KEY (base_year, quarter_start, release_date)
 );
 
--- One row per load so check 4 can compare row counts with the source files.
-CREATE TABLE IF NOT EXISTS load_log (
-    table_name TEXT PRIMARY KEY,
-    source_csv TEXT NOT NULL,
-    csv_rows   INTEGER NOT NULL,
-    loaded_at  TEXT NOT NULL
-);
-
 -- Week 3 outputs, written by src/analysis/run_week3.py.
 -- Index values for display (standardised on the whole sample; backtest forecasts never use these).
 CREATE TABLE IF NOT EXISTS index_monthly (
@@ -124,4 +117,22 @@ CREATE TABLE IF NOT EXISTS backtest_results (
     abs_error        REAL,
     direction_correct REAL,                      -- 1 / 0, NULL if either move was zero
     PRIMARY KEY (month, model)
+);
+
+-- Pre-registered forecasts, written by src/analysis/forecast.py --final. One row per target month and version.
+-- actual_pct stays empty until the official release, then is filled by the scoring step (the forecast file itself is never edited).
+CREATE TABLE IF NOT EXISTS forecast_log (
+    target_month        TEXT NOT NULL REFERENCES dim_date(month_start),
+    version             INTEGER NOT NULL,
+    made_on             TEXT NOT NULL,
+    git_commit          TEXT NOT NULL,
+    model               TEXT NOT NULL,
+    point_pct           REAL,
+    lo80_pct REAL, hi80_pct REAL, lo90_pct REAL, hi90_pct REAL,
+    baseline_mean12_pct REAL,
+    baseline_last_pct   REAL,
+    gdp_call            TEXT,                    -- BELOW / ABOVE the previous quarter's growth
+    gdp_threshold_pct   REAL,
+    actual_pct          REAL,
+    PRIMARY KEY (target_month, version)
 );
