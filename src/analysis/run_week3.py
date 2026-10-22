@@ -3,7 +3,7 @@
 Writes to data/pulse.db: index_monthly, backtest_results (and the v_backtest_summary view reads them).
 Writes to docs/results/: lag_tests.csv, backtest_summary.csv, robustness.csv, pca_weights.csv.
 
-Usage:  python src/analysis/run_week3.py     (run src/load_db.py first so the database is current)
+Usage:  python src/analysis/run_week3.py     (run src/gold/build_gold.py first so the database is current)
 """
 import sqlite3
 import sys
@@ -54,7 +54,7 @@ def robustness(panel22: pd.DataFrame) -> pd.DataFrame:
 def save_sql(index: pd.DataFrame, res: pd.DataFrame, panel: pd.DataFrame) -> None:
     con = sqlite3.connect(DB)
     con.execute("PRAGMA foreign_keys = ON")
-    schema = (ROOT / "sql" / "schema.sql").read_text(encoding="utf-8")
+    schema = (ROOT / "sql" / "gold_schema.sql").read_text(encoding="utf-8")
     con.executescript(schema)
     con.execute("DELETE FROM index_monthly")
     con.execute("DELETE FROM backtest_results")

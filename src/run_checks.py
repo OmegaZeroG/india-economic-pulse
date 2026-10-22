@@ -1,4 +1,4 @@
-"""Run the five SQL checks in sql/checks.sql against data/pulse.db.
+"""Run the SQL checks in sql/checks.sql against data/pulse.db.
 
 Prints PASS/FAIL per check and appends any failure to docs/data_quality_log.md.
 Exit code is the number of failed checks (0 = all pass).
@@ -10,7 +10,7 @@ import sqlite3
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent / "ingest"))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 from common import ROOT, log_issue  # noqa: E402
 
 DB = ROOT / "data" / "pulse.db"
