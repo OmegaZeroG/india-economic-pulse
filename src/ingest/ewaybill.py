@@ -17,11 +17,26 @@ import pandas as pd
 
 from common import CLEAN, RAW, log_issue, upsert
 
-GROUPS = {"within": 4, "out": 7, "in": 10}  # first column of each group in the sheet
+# FY2018-19 workbooks say INTRA STATE / Inter State Outward / Inter State Inward; later ones WITHIN-STATE / OUTGOING / INCOMING
+GROUP_WORDS = {"within": ("within", "intra"), "out": ("outgoing", "outward"), "in": ("incoming", "inward")}
+
+
+def _group_columns(sheet: pd.DataFrame) -> dict:
+    """First column of each group (suppliers, bills, value), found from the header text so that
+    older workbooks with another column order or without a group still load (missing group = blank).."""
+    cols = {}
+    for g, word in GROUP_WORDS.items():
+        for i in range(min(8, len(sheet))):
+            hit = [j for j, v in sheet.iloc[i].items() if any(w in str(v).lower() for w in word)]
+            if hit:
+                cols[g] = hit[0]
+                break
+    return cols
 
 
 def parse(path) -> pd.DataFrame:
     sheet = pd.read_excel(path, header=None, sheet_name=0)
+    groups = _group_columns(sheet)
     rows = []
     for i in range(len(sheet)):
         code = pd.to_numeric(sheet.iloc[i, 0], errors="coerce")
@@ -30,9 +45,10 @@ def parse(path) -> pd.DataFrame:
             continue
         rec = {"month": f"{int(year)}-{int(month):02d}-01", "state_code": int(code),
                "state": str(sheet.iloc[i, 1]).strip().title().replace(" And ", " and ")}
-        for g, c in GROUPS.items():
-            rec[f"{g}_suppliers"], rec[f"{g}_ewb"], rec[f"{g}_value_cr"] = (
-                pd.to_numeric(sheet.iloc[i, c + k], errors="coerce") for k in range(3))
+        for g in GROUP_WORDS:
+            c = groups.get(g)
+            vals = [pd.to_numeric(sheet.iloc[i, c + k], errors="coerce") for k in range(3)] if c is not None else [float("nan")] * 3
+            rec[f"{g}_suppliers"], rec[f"{g}_ewb"], rec[f"{g}_value_cr"] = vals
         rows.append(rec)
     return pd.DataFrame(rows)
 
