@@ -30,9 +30,15 @@ def month_key(year: int, month: int) -> pd.Timestamp:
 
 
 def log_issue(source: str, issue: str, action: str, rows: str = "") -> None:
-    """Append one line to docs/data_quality_log.md."""
+    """Append one line to docs/data_quality_log.md, unless the same issue is already logged.
+
+    Loaders run every month, so an identical source/issue/action is written once, not once per run.
+    """
+    tail = f"| {source} | {issue} | {action} | {rows} |"
+    if LOG.exists() and tail in LOG.read_text(encoding="utf-8"):
+        return
     with open(LOG, "a", encoding="utf-8") as f:
-        f.write(f"| {today()} | {source} | {issue} | {action} | {rows} |\n")
+        f.write(f"| {today()} {tail}\n")
 
 
 def upsert(new: pd.DataFrame, path: Path, key: list[str]) -> int:
