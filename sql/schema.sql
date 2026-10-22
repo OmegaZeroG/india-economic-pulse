@@ -102,3 +102,26 @@ CREATE TABLE IF NOT EXISTS load_log (
     csv_rows   INTEGER NOT NULL,
     loaded_at  TEXT NOT NULL
 );
+
+-- Week 3 outputs, written by src/analysis/run_week3.py.
+-- Index values for display (standardised on the whole sample; backtest forecasts never use these).
+CREATE TABLE IF NOT EXISTS index_monthly (
+    month          TEXT PRIMARY KEY REFERENCES dim_date(month_start),
+    zscore_index   REAL,                         -- equal-weight average of standardised YoY growth
+    pca_index      REAL,                         -- first principal component, signed to rise with IIP
+    n_indicators   INTEGER,
+    iip_yoy_pct    REAL,                         -- target, base 2022-23
+    diwali_shift   INTEGER                       -- 1 if Diwali moved in or out of this month vs a year earlier
+);
+
+-- Rolling-origin backtest: each row is a forecast made using only earlier months.
+CREATE TABLE IF NOT EXISTS backtest_results (
+    month            TEXT NOT NULL REFERENCES dim_date(month_start),
+    model            TEXT NOT NULL,              -- naive_last, naive_mean12, zscore_index, pca_index, regression
+    forecast         REAL,
+    actual           REAL,
+    prev_actual      REAL,                       -- last IIP growth known when the forecast was made
+    abs_error        REAL,
+    direction_correct REAL,                      -- 1 / 0, NULL if either move was zero
+    PRIMARY KEY (month, model)
+);

@@ -7,6 +7,7 @@ DROP VIEW IF EXISTS v_growth_monthly;
 DROP VIEW IF EXISTS v_iip_latest;
 DROP VIEW IF EXISTS v_iip_target;
 DROP VIEW IF EXISTS v_gdp_latest;
+DROP VIEW IF EXISTS v_backtest_summary;
 
 -- Latest observed version of every IIP month (revisions are kept in fact_iip, never overwritten).
 CREATE VIEW v_iip_latest AS
@@ -43,3 +44,14 @@ SELECT month, indicator, value,
             THEN 100.0 * (value / LAG(value, 12) OVER w - 1) END AS yoy_pct
 FROM base
 WINDOW w AS (PARTITION BY indicator ORDER BY month);
+
+-- Backtest scorecard: MAE, direction hit rate and MAE improvement over the better naive baseline.
+CREATE VIEW v_backtest_summary AS
+WITH m AS (
+    SELECT model, COUNT(*) AS n_months, AVG(abs_error) AS mae, 100.0 * AVG(direction_correct) AS direction_hit_pct
+    FROM backtest_results GROUP BY model
+)
+SELECT model, n_months, ROUND(mae, 3) AS mae, ROUND(direction_hit_pct, 1) AS direction_hit_pct,
+       ROUND(100.0 * ((SELECT MIN(mae) FROM m WHERE model LIKE 'naive%') - mae)
+             / (SELECT MIN(mae) FROM m WHERE model LIKE 'naive%'), 1) AS mae_improvement_vs_best_baseline_pct
+FROM m;

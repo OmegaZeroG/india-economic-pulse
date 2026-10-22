@@ -1,0 +1,6 @@
+model,n_months,mae,rmse,direction_hit_pct,mae_improvement_vs_best_baseline_pct
+naive_last,71,4.561,7.951,,0.0
+naive_mean12,71,6.028,11.073,60.87,-32.18
+zscore_index,71,5.375,6.093,56.522,-17.852
+pca_index,71,4.127,5.103,57.971,9.503
+regression,71,3.72,4.986,52.174,18.431
